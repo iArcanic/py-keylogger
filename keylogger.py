@@ -3,6 +3,40 @@ import time
 import argparse
 from cryptography.fernet import Fernet
 from pynput.keyboard import Key, Listener
+import platform
+import subprocess
+
+def get_keyboard_layout_name():
+    system = platform.system()
+    print("Operating system: " + system)
+    if system == "Windows":
+        import ctypes
+        buffer_size = 9  # Max size for keyboard layout names
+        buffer = ctypes.create_unicode_buffer(buffer_size)
+        ctypes.windll.user32.GetKeyboardLayoutNameW(buffer_size)
+        return buffer.value
+    elif system == "Darwin":
+        try:
+            output = subprocess.check_output(["osascript", "-e", 'do shell script "ioreg -n IOHIDKeyboard -r | awk \'/KeyboardLanguage/ { print $4 }\'"'])
+            layout_name = output.decode("utf-8").strip()
+            return layout_name
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")
+            return "Unknown"
+    elif system == "Linux":
+        try:
+            output = subprocess.check_output(["setxkbmap", "-query"]).decode("utf-8")
+            layout_line = [line for line in output.splitlines() if line.startswith("layout:")][0]
+            layout_name = layout_line.split(":")[1].strip()
+            return layout_name
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")
+            return "Unknown"
+    else:
+        return "Unknown"
+
+keyboard_layout = get_keyboard_layout_name()
+print(f"Keyboard Layout: {keyboard_layout}")
 
 # Function to parse command-line arguments
 def parse_arguments():
